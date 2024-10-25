@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artistic Robot Generator</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #1a1a1a;
+            margin: 0;
+            font-family: 'Arial', sans-serif;
+        }
+        #robot-container {
+            border: 4px solid #4a4a4a;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            background-color: #2a2a2a;
+        }
+        h1 {
+            text-align: center;
+            color: #f0f0f0;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        #generate-btn {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 1.2em;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #generate-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div id="robot-container">
+        <div id="svg-container"></div>
+
+    </div>
+
+<script>
+  function createRobot() {
+    const container = document.getElementById('svg-container');
+    container.innerHTML = ''; // Clear previous robot
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '400');
+    svg.setAttribute('height', '600');
+    svg.setAttribute('viewBox', '0 0 400 600');
+
+    // Create artistic patterns
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    
+    // Artistic metallic gradient
+    const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    gradient.setAttribute('id', 'artisticGradient');
+    gradient.setAttribute('x1', '0%');
+    gradient.setAttribute('y1', '0%');
+    gradient.setAttribute('x2', '100%');
+    gradient.setAttribute('y2', '100%');
+
+    const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop1.setAttribute('offset', '0%');
+    stop1.setAttribute('style', 'stop-color:#c0c0c0;stop-opacity:1');
+    gradient.appendChild(stop1);
+
+    const stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop2.setAttribute('offset', '50%');
+    stop2.setAttribute('style', 'stop-color:#f0f0f0;stop-opacity:1');
+    gradient.appendChild(stop2);
+
+    const stop3 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    stop3.setAttribute('offset', '100%');
+    stop3.setAttribute('style', 'stop-color:#a0a0a0;stop-opacity:1');
+    gradient.appendChild(stop3);
+
+    defs.appendChild(gradient);
+    svg.appendChild(defs);
+
+    // Robot head (more humanlike)
+    const head = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    head.setAttribute('cx', '200');
+    head.setAttribute('cy', '140');
+    head.setAttribute('r', '60');
+    head.setAttribute('fill', 'url(#artisticGradient)');
+    head.setAttribute('stroke', '#606060');
+    head.setAttribute('stroke-width', '3');
+    svg.appendChild(head);
+
+    // Robot eyes (more humanlike)
+    const leftEye = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    leftEye.setAttribute('cx', '180');
+    leftEye.setAttribute('cy', '130');
+    leftEye.setAttribute('r', '10');
+    leftEye.setAttribute('fill', '#00f');
+    svg.appendChild(leftEye);
+
+    const rightEye = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    rightEye.setAttribute('cx', '220');
+    rightEye.setAttribute('cy', '130');
+    rightEye.setAttribute('r', '10');
+    rightEye.setAttribute('fill', '#00f');
+    svg.appendChild(rightEye);
+
+    // Robot mouth (more humanlike)
+    const mouth = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    mouth.setAttribute('d', 'M180,160 Q200,180 220,160');
+    mouth.setAttribute('stroke', '#606060');
+    mouth.setAttribute('stroke-width', '3');
+    mouth.setAttribute('fill', 'none');
+    svg.appendChild(mouth);
+
+    // Robot body (abstract shape)
+    const body = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    body.setAttribute('d', 'M180,220 Q200,240 220,220 L240,400 Q200,420 160,400 Z');
+    body.setAttribute('fill', 'url(#artisticGradient)');
+    body.setAttribute('stroke', '#606060');
+    body.setAttribute('stroke-width', '3');
+    svg.appendChild(body);
+
+    // Robot arms (abstract curves)
+    const leftArm = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    leftArm.setAttribute('d', 'M160,240 Q100,300 120,380');
+    leftArm.setAttribute('stroke', 'url(#artisticGradient)');
+    leftArm.setAttribute('stroke-width', '20');
+    leftArm.setAttribute('fill', 'none');
+    svg.appendChild(leftArm);
+
+    const rightArm = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    rightArm.setAttribute('d', 'M240,240 Q300,300 280,380');
+    rightArm.setAttribute('stroke', 'url(#artisticGradient)');
+    rightArm.setAttribute('stroke-width', '20');
+    rightArm.setAttribute('fill', 'none');
+    svg.appendChild(rightArm);
+
+    // Robot legs (abstract shapes)
+    const leftLeg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    leftLeg.setAttribute('d', 'M180,400 L160,560 L200,560 Z');
+    leftLeg.setAttribute('fill', 'url(#artisticGradient)');
+    leftLeg.setAttribute('stroke', '#606060');
+    leftLeg.setAttribute('stroke-width', '3');
+    svg.appendChild(leftLeg);
+
+    const rightLeg = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    rightLeg.setAttribute('d', 'M220,400 L200,560 L240,560 Z');
+    rightLeg.setAttribute('fill', 'url(#artisticGradient)');
+    rightLeg.setAttribute('stroke', '#606060');
+    rightLeg.setAttribute('stroke-width', '3');
+    svg.appendChild(rightLeg);
+
+    container.appendChild(svg);
+  }
+
+  // Call the function to create the initial robot
+  createRobot();
+
+  // Add event listener to the generate button
+  document.getElementById('generate-btn').addEventListener('click', createRobot);
+
+  // Make the createRobot function available globally
+  window.createRobot = createRobot;
+</script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.10.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.10.0/addons/p5.sound.min.js"></script>
+    
+    <meta charset="utf-8" />
+    <style>
+        .controls-panel {
+            position: fixed;
+            right: 20px;
+            top: 420px; /* Positioned below canvas height of 400px */
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            width: 200px;
+            cursor: pointer;
+        }
+        
+        .controls-panel.folded {
+            width: 40px;
+            overflow: hidden;
+        }
+
+        .controls-panel h3 {
+            margin: 0;
+            padding: 5px 0;
+        }
+
+        .controls-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+
+        .controls-list li {
+            margin: 5px 0;
+        }
+
+        .toggle-btn {
+            position: absolute;
+            left: 10px;
+            top: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+    </main>
+    <div class="controls-panel folded" onclick="this.classList.toggle('folded')">
+        <h3>🎮 Controls</h3>
+        <ul class="controls-list">
+            <li>WASD - Move</li>
+            <li>SPACE - Jump</li>
+            <li>SHIFT - Dash</li>
+            <li>J - Attack</li>
+            <li>K - Stretch</li>
+        </ul>
+    </div>
+    <script src="sketch.js"></script>
+    <script src="box.js"></script>
+</body>
+
+</html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            background-image: url('1378541.jpg');
+            background-size: cover;
+            position: relative;
+            transition: filter 0.5s;
+        }
+        .collage-img {
+            position: absolute;
+            transition: transform 0.5s, opacity 0.5s;
+            opacity: 0;
+            animation: shake 0.5s infinite;
+            cursor: grab;
+        }
+        .collage-img:hover {
+            opacity: 1;
+            animation-play-state: paused;
+        }
+        @keyframes shake {
+            0% { transform: rotate(0deg); }
+            25% { transform: rotate(5deg); }
+            50% { transform: rotate(0deg); }
+            75% { transform: rotate(-5deg); }
+            100% { transform: rotate(0deg); }
+        }
+    </style>
+</head>
+<body>
+    <img src="img1.png" id="img1" class="collage-img" style="width: 65%;">
+    <img src="img2.png" id="img2" class="collage-img" style="width: 30%;">
+    <img src="img3.png" id="img3" class="collage-img" style="width: 35%;">
+    <img src="img4.png" id="img4" class="collage-img" style="width: 35%;">
+    <img src="img5.png" id="img5" class="collage-img" style="width: 30%;">
+    <img src="img6.png" id="img6" class="collage-img" style="width: 40%;">
+    <img src="img7.png" id="img7" class="collage-img" style="width: 10%;">
+     <script src="sketch.js"></script>
+</body>
+</html>
