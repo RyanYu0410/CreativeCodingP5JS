@@ -18,7 +18,7 @@ function setup() {
         myRobots[i] = new Robot(random(width/3, width/3*2), random(height/3, height/3*2), random(5, 40));
     }
    
-    // Create multiple random boxes
+
     for (let i = 0; i < 10; i++) {
         boxes.push(new Box(random(width), random(height), random(10, 80), random(10, 80)));
     }
@@ -71,7 +71,11 @@ function draw() {
         for (let i = myRobots.length - 1; i >= 0; i--) {
             let robot = myRobots[i];
             robot.display();
-            robot.move();
+            if (score >= 200) {
+                robot.moveRandomly();
+            } else {
+                robot.move();
+            }
             robot.attack();
             robot.stretch();
             robot.dash();
@@ -122,6 +126,7 @@ function draw() {
         fill(0);
         textSize(20);
         textAlign(RIGHT, TOP);
+        textFont('Orbitron');
         text(`Score: ${score}`, width - 10, 10);
     } else {
         displayEndScreen();
@@ -191,13 +196,14 @@ function displayEndScreen() {
         fill(255);
         textSize(32);
         textAlign(CENTER, CENTER);
-        textFont('Courier New');
+        textFont('Orbitron');
         text("How does it feel to be a robot?", width / 2, height / 2);
     } else {
         background(0);
         fill(255);
         textSize(32);
         textAlign(CENTER, CENTER);
+        textFont('Orbitron');
         text(`Final Score: ${score}`, width / 2, height / 2);
     }
 }
@@ -262,10 +268,11 @@ class Robot {
     drawFrontView() {
         // Body
         fill(this.isDashing ? color(255, 0, 0) : this.color);
+        noStroke();
         rect(0, 0, this.size, this.size * 1.5);
         
         // Head
-        fill(this.isDashing ? color(255, 50, 50) : color(220));
+        fill(this.isDashing ? color(255, 50, 50) : color(233));
         rect(this.size * 0.1, -this.size * 0.6, this.size * 0.8, this.size * 0.6);
         
         // Antenna
@@ -295,6 +302,7 @@ class Robot {
     drawSideView() {
         // Body
         fill(this.isDashing ? color(255, 0, 0) : this.color);
+        noStroke();
         rect(0, 0, this.size, this.size * 1.5);
         
         // Head
@@ -387,6 +395,26 @@ class Robot {
         // Reset leg angle when not moving
         if (!this.isMoving) {
             this.legAngle = 0;
+        }
+
+        // Keep robot within canvas bounds
+        this.x = constrain(this.x, 0, width - this.size);
+        this.y = constrain(this.y, 0, height - this.size * 2 * this.stretchFactor);
+    }
+
+    moveRandomly() {
+        this.velocity += this.gravity;
+        this.y += this.velocity;
+
+        this.isMoving = true;
+
+        // Randomly move in x and y directions
+        this.x += random(-5, 5);
+        this.y += random(-5, 5);
+
+        // Randomly change direction
+        if (random() < 0.05) {
+            this.direction *= -1;
         }
 
         // Keep robot within canvas bounds

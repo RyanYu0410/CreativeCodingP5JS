@@ -22,6 +22,7 @@ class Box {
     display() {
         push();
         translate(this.x, this.y);
+        noStroke(); 
         if (this.isWhite) {
             fill(255);
         } else {

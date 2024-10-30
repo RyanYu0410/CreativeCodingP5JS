@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robot Simulator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.10.0/p5.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
+        
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #fff;
+            font-family: 'Orbitron', sans-serif;
+        }
+        h1 {
+            color: #00f;
+            font-size: 28px;
+            text-align: center;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00f;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .start-button {
+            padding: 15px 30px;
+            font-size: 24px;
+            background: transparent;
+            color: #00f;
+            border: 2px solid #00f;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            letter-spacing: 1px;
+        }
+        .start-button:hover {
+            background: #00f;
+            color: #fff;
+            box-shadow: 0 0 20px #00f;
+        }
+    </style>
+</head>
+<body>
+    <h1>ROBOT SIMULATOR</h1>
+    <div id="canvas-container"></div>
+    <button class="start-button" onclick="window.location.href='dialoge.html'">START SIMULATION</button>
+
+    <script>
+        let robot;
+        let targetX, targetY;
+        let easing = 0.05;
+
+        function setup() {
+            const canvas = createCanvas(400, 300);
+            canvas.parent('canvas-container');
+            robot = new Robot(width/2, height/2, 30);
+            targetX = robot.x;
+            targetY = robot.y;
+        }
+
+        function draw() {
+            background(255);
+            
+            // Draw grid lines
+            stroke(0, 0, 255, 50);
+            for(let i = 0; i < width; i += 20) {
+                line(i, 0, i, height);
+            }
+            for(let i = 0; i < height; i += 20) {
+                line(0, i, width, i);
+            }
+
+            // Update target position occasionally
+            if (frameCount % 60 === 0) {
+                targetX += random(-220, 220);
+                targetY += random(-220, 220);
+            }
+
+            // Move robot smoothly towards target
+            let dx = targetX - robot.x;
+            let dy = targetY - robot.y;
+            robot.x += dx * easing;
+            robot.y += dy * easing;
+
+            // Keep robot within canvas bounds
+            robot.x = constrain(robot.x, 0, width);
+            robot.y = constrain(robot.y, 0, height);
+            targetX = constrain(targetX, 0, width);
+            targetY = constrain(targetY, 0, height);
+
+            robot.display();
+        }
+
+        class Robot {
+            constructor(x, y, size) {
+                this.x = x;
+                this.y = y;
+                this.size = size;
+            }
+
+            display() {
+                push();
+                translate(this.x, this.y);
+                
+                // Body
+                fill(200);
+                rect(0, 0, this.size, this.size * 1.5);
+                
+                // Head
+                fill(220);
+                rect(this.size * 0.1, -this.size * 0.6, this.size * 0.8, this.size * 0.6);
+                
+                // Eyes
+                fill(0);
+                ellipse(this.size * 0.3, -this.size * 0.4, this.size * 0.1);
+                ellipse(this.size * 0.7, -this.size * 0.4, this.size * 0.1);
+                
+                // Mouth
+                rect(this.size * 0.3, -this.size * 0.2, this.size * 0.4, this.size * 0.05);
+                
+                // Arms
+                fill(180);
+                rect(-this.size * 0.2, 0, this.size * 0.2, this.size * 0.8);
+                rect(this.size, 0, this.size * 0.2, this.size * 0.8);
+                
+                // Legs
+                rect(this.size * 0.1, this.size * 1.5, this.size * 0.3, this.size * 0.5);
+                rect(this.size * 0.6, this.size * 1.5, this.size * 0.3, this.size * 0.5);
+                
+                pop();
+            }
+        }
+    </script>
+</body>
+</html>
