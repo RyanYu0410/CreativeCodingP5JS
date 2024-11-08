@@ -1,4 +1,4 @@
-// Copyright (c) 2018 ml5
+// Copyright (c) 2019 ml5
 //
 // This software is released under the MIT License.
 // https://opensource.org/licenses/MIT
@@ -6,6 +6,7 @@
 /* ===
 ml5 Example
 PoseNet example using p5.js
+https://learn.ml5js.org/#/reference/posenet
 === */
 
 let video;
@@ -13,7 +14,7 @@ let poseNet;
 let poses = [];
 
 function setup() {
-    createCanvas(640, 480);
+    createCanvas(1280, 960);
     video = createCapture(VIDEO);
     video.size(width, height);
 

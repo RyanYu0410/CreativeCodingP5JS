@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+        }
+    </style>
+</head>
+<body>
+<script>
+let segments = [];
+let stars = [];
+let fogParticles = [];
+const numStars = 100;
+const numSegments = 20; // Increased number of segments
+const numFogParticles = 150;
+let isMousePressed = false;
+
+function setup() {
+    createCanvas(windowWidth, windowHeight);
+    
+    // Create segments for the reaching arm
+    for (let i = 0; i < numSegments; i++) {
+        segments.push(new Segment(40, 0, 10, radians(i * 2))); // Decreased segment length
+    }
+    
+    // Connect segments
+    for (let i = 0; i < segments.length - 1; i++) {
+        segments[i].child = segments[i + 1];
+    }
+    
+    // Create stars
+    for (let i = 0; i < numStars; i++) {
+        stars.push({
+            x: random(width),
+            y: random(height),
+            size: random(1, 4),
+            speed: random(0.5, 2)
+        });
+    }
+
+    // Create fog particles
+    for (let i = 0; i < numFogParticles; i++) {
+        fogParticles.push({
+            x: random(width),
+            y: random(height),
+            size: random(10, 150),
+            speed: random(0.2, 8),
+            opacity: random(2, 3) // Reduced opacity range
+        });
+    }
+}
+
+function draw() {
+    background(0, 20);
+    
+    // Draw fog effect
+    noStroke();
+    fogParticles.forEach(particle => {
+        drawFogParticle(particle);
+        particle.x += particle.speed;
+        if (particle.x > width + particle.size) particle.x = -particle.size;
+    });
+    
+    // Draw and update stars with glow
+    stars.forEach(star => {
+        drawGlowingStar(star);
+        star.x -= star.speed;
+        if (star.x < 0) star.x = width;
+    });
+    
+    // Update segments only when mouse is pressed
+    if (mouseIsPressed) {
+        let target = createVector(mouseX, mouseY);
+        segments[0].follow(target.x, target.y);
+        segments[0].update();
+        
+        // Update all other segments
+        for (let i = 1; i < segments.length; i++) {
+            segments[i].follow(segments[i-1].a.x, segments[i-1].a.y);
+            segments[i].update();
+        }
+    } else {
+        // When mouse is not pressed, segments slowly return to original position
+        let centerX = width/2;
+        let centerY = height/2;
+        let easing = 0.05;
+        
+        segments[0].a.x += (centerX - segments[0].a.x) * easing;
+        segments[0].a.y += (centerY - segments[0].a.y) * easing;
+        segments[0].update();
+        
+        for (let i = 1; i < segments.length; i++) {
+            segments[i].follow(segments[i-1].a.x, segments[i-1].a.y);
+            segments[i].update();
+        }
+    }
+    
+    // Draw segments with gradient color and fog interaction
+    for (let i = 0; i < segments.length; i++) {
+        let c = color(255 - i * 20, 100 + i * 13, 200); // Adjusted color spread for more segments
+        segments[i].show(c);
+    }
+}
+
+function drawFogParticle(particle) {
+    let gradient = drawingContext.createRadialGradient(
+        particle.x, particle.y, 0,
+        particle.x, particle.y, particle.size
+    );
+    gradient.addColorStop(0, `rgba(50, 74, 118, ${particle.opacity/100})`); // Darker blue color
+    gradient.addColorStop(1, 'rgba(50, 74, 118, 0)'); // Matching darker blue
+    drawingContext.fillStyle = gradient;
+    circle(particle.x, particle.y, particle.size * 2);
+}
+
+function drawGlowingStar(star) {
+    drawingContext.shadowBlur = 15;
+    drawingContext.shadowColor = 'rgba(255, 255, 255, 0.5)';
+    fill(255);
+    circle(star.x, star.y, star.size);
+    drawingContext.shadowBlur = 0;
+}
+
+class Segment {
+    constructor(len_, angle_, x, y) {
+        this.len = len_;
+        this.angle = angle_;
+        this.selfAngle = angle_;
+        
+        this.a = createVector(x, y);
+        this.b = createVector();
+        this.child = null;
+        
+        this.calculateB();
+    }
+    
+    calculateB() {
+        this.b.x = this.a.x + this.len * cos(this.angle);
+        this.b.y = this.a.y + this.len * sin(this.angle);
+    }
+    
+    follow(tx, ty) {
+        let target = createVector(tx, ty);
+        let dir = p5.Vector.sub(target, this.a);
+        this.angle = dir.heading();
+        
+        dir.setMag(this.len);
+        dir.mult(-1);
+        this.a = p5.Vector.add(target, dir);
+    }
+    
+    update() {
+        this.calculateB();
+    }
+    
+    show(color) {
+        drawingContext.shadowBlur = 20;
+        drawingContext.shadowColor = color;
+        
+        stroke(color);
+        strokeWeight(8); // Reduced stroke weight for more segments
+        line(this.a.x, this.a.y, this.b.x, this.b.y);
+        
+        strokeWeight(4); // Reduced inner line weight
+        stroke(255, 100);
+        line(this.a.x, this.a.y, this.b.x, this.b.y);
+        
+        fill(color);
+        noStroke();
+        drawingContext.shadowBlur = 15;
+        circle(this.a.x, this.a.y, 10); // Slightly smaller joints for more segments
+        
+        drawingContext.shadowBlur = 0;
+    }
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
+</script>
+</body>
+</html>

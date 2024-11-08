@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bouncing Balls 2D</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <script>
+        let canvas, ctx;
+
+        function setup() {
+            canvas = document.createElement('canvas');
+            ctx = canvas.getContext('2d');
+            document.body.appendChild(canvas);
+            
+            updateCanvasSize(window.innerWidth, window.innerHeight);
+            window.addEventListener('resize', updateCanvasSize);
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+            canvas.addEventListener('click', handleClick);
+            animate();
+        }
+
+        function updateCanvasSize(width, height) {
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        let balls = [];
+        let particles = [];
+        let collisionCircles = []; // Array to store collision circles
+        let windX = 0;
+        let windY = 0;
+        const windForce = 0.2;
+        class CollisionCircle {
+            constructor(x, y, radius) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.alpha = 1;
+                this.fadeSpeed = 0.01;
+                this.growSpeed = 2;
+                this.lineWidth = 0;
+                this.lineWidthGrowthBase = 1.5; // Base for exponential growth
+                this.lineWidthGrowthExponent = 0; // Exponent that will increase
+            }
+
+            update() {
+                this.alpha -= this.fadeSpeed;
+                this.radius *= this.growSpeed;
+                this.lineWidthGrowthExponent += 1.9;
+                this.lineWidth = Math.pow(this.lineWidthGrowthBase, this.lineWidthGrowthExponent);
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(233, 233, 233, ${this.alpha})`;
+                ctx.lineWidth = this.lineWidth;
+                ctx.stroke();
+                ctx.closePath();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.dx = (Math.random() - 0.5) * 4;
+                this.dy = (Math.random() - 0.5) * 4;
+                this.radius = 3;
+                this.color = color;
+                this.alpha = 1;
+                this.fadeSpeed = 0.02;
+                this.shrinkRate = 0.99;
+            }
+
+            update() {
+                this.dx += windX * 0.1;
+                this.dy += windY * 0.1;
+                this.x += this.dx;
+                this.y += this.dy;
+                this.alpha -= this.fadeSpeed;
+                this.radius *= this.shrinkRate;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.color.r * 255}, ${this.color.g * 255}, ${this.color.b * 255}, ${this.alpha})`;
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        class Ball {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.radius = 20;
+                this.dx = (Math.random() - 0.5) * 8;
+                this.dy = -15;
+                this.gravity = 0.5;
+                this.friction = 0.8;
+                this.color = {
+                    r: Math.random(),
+                    g: Math.random(),
+                    b: Math.random()
+                };
+                this.shrinkRate = 0.95;
+            }
+
+            update() {
+                this.dy += this.gravity;
+                this.dx += windX * windForce;
+                this.dy += windY * windForce;
+                
+                this.x += this.dx;
+                this.y += this.dy;
+
+                if (this.x + this.radius > canvas.width || this.x - this.radius < 0) {
+                    this.dx = -this.dx * this.friction;
+                    this.radius *= this.shrinkRate;
+                    this.createCollisionParticles(Math.abs(this.dx));
+                    collisionCircles.push(new CollisionCircle(this.x, this.y, this.radius));
+                }
+
+                if (this.y + this.radius > canvas.height) {
+                    this.y = canvas.height - this.radius;
+                    this.dy = -this.dy * this.friction;
+                    this.radius *= this.shrinkRate;
+                    this.createCollisionParticles(Math.abs(this.dx));
+                    collisionCircles.push(new CollisionCircle(this.x, this.y, this.radius));
+                }
+
+                balls.forEach(otherBall => {
+                    if (otherBall === this) return;
+
+                    const dx = otherBall.x - this.x;
+                    const dy = otherBall.y - this.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    if (distance < this.radius + otherBall.radius) {
+                        const angle = Math.atan2(dy, dx);
+                        const sin = Math.sin(angle);
+                        const cos = Math.cos(angle);
+
+                        const velocities = this.rotateVelocities(this, otherBall, sin, cos);
+                        
+                        this.dx = velocities.dx1 * this.friction;
+                        this.dy = velocities.dy1 * this.friction;
+                        otherBall.dx = velocities.dx2 * this.friction;
+                        otherBall.dy = velocities.dy2 * this.friction;
+
+                        this.radius *= this.shrinkRate;
+                        otherBall.radius *= otherBall.shrinkRate;
+
+                        this.createCollisionParticles(Math.abs(this.dx));
+                        collisionCircles.push(new CollisionCircle(
+                            (this.x + otherBall.x) / 2,
+                            (this.y + otherBall.y) / 2,
+                            (this.radius + otherBall.radius) / 2
+                        ));
+                    }
+                });
+            }
+
+            rotateVelocities(ball1, ball2, sin, cos) {
+                const vx1 = ball1.dx * cos + ball1.dy * sin;
+                const vy1 = ball1.dy * cos - ball1.dx * sin;
+                const vx2 = ball2.dx * cos + ball2.dy * sin;
+                const vy2 = ball2.dy * cos - ball2.dx * sin;
+
+                return {
+                    dx1: vx2 * cos - vy1 * sin,
+                    dy1: vy1 * cos + vx2 * sin,
+                    dx2: vx1 * cos - vy2 * sin,
+                    dy2: vy2 * cos + vx1 * sin
+                };
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgb(${this.color.r * 255}, ${this.color.g * 255}, ${this.color.b * 255})`;
+                ctx.fill();
+                ctx.closePath();
+            }
+
+            createCollisionParticles(speed) {
+                const particleCount = Math.floor(Math.abs(speed) * 2);
+                for (let i = 0; i < particleCount; i++) {
+                    particles.push(new Particle(this.x, this.y, this.color));
+                }
+            }
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update and remove faded collision circles
+            collisionCircles = collisionCircles.filter(circle => {
+                if (circle.alpha <= 0) return false;
+                circle.update();
+                circle.draw();
+                return true;
+            });
+
+            particles = particles.filter(particle => {
+                if (particle.alpha <= 0 || particle.radius < 0.1) return false;
+                particle.update();
+                particle.draw();
+                return true;
+            });
+
+            balls = balls.filter(ball => {
+                ball.update();
+                ball.draw();
+                if (Math.abs(ball.dy) < 0.1 && ball.y >= canvas.height - ball.radius || ball.radius < 2) {
+                    return false;
+                }
+                return true;
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        function handleClick(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            balls.push(new Ball(x, y));
+        }
+
+        function handleKeyDown(event) {
+            switch(event.key) {
+                case 'ArrowLeft':
+                    windX = -1;
+                    break;
+                case 'ArrowRight':
+                    windX = 1;
+                    break;
+                case 'ArrowUp':
+                    windY = -1;
+                    break;
+                case 'ArrowDown':
+                    windY = 1;
+                    break;
+            }
+        }
+
+        function handleKeyUp(event) {
+            switch(event.key) {
+                case 'ArrowLeft':
+                case 'ArrowRight':
+                    windX = 0;
+                    break;
+                case 'ArrowUp':
+                case 'ArrowDown':
+                    windY = 0;
+                    break;
+            }
+        }
+
+        setup();
+    </script>
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Bouncing Balls 3D</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        const pointLight = new THREE.PointLight(0xffffff, 1);
+        pointLight.position.set(10, 10, 10);
+        scene.add(pointLight);
+
+        // Add ground plane
+        const planeGeometry = new THREE.PlaneGeometry(100, 100);
+        const planeMaterial = new THREE.MeshPhongMaterial({ color: 0xf0f0f0 });
+        const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.y = -20;
+        scene.add(plane);
+
+        // Add walls
+        const wallMaterial = new THREE.MeshPhongMaterial({ color: 0xf0f0f0, transparent: true, opacity: 0.3 });
+        const backWall = new THREE.Mesh(planeGeometry, wallMaterial);
+        backWall.position.z = -50;
+        scene.add(backWall);
+
+        const leftWall = new THREE.Mesh(planeGeometry, wallMaterial);
+        leftWall.rotation.y = Math.PI / 2;
+        leftWall.position.x = -50;
+        scene.add(leftWall);
+
+        const rightWall = new THREE.Mesh(planeGeometry, wallMaterial);
+        rightWall.rotation.y = -Math.PI / 2;
+        rightWall.position.x = 50;
+        scene.add(rightWall);
+
+        // Set camera position
+        camera.position.set(50, 30, 70);
+        camera.lookAt(0, 0, 0);
+
+        let balls = [];
+        let particles = [];
+
+        class Particle {
+            constructor(x, y, z, color) {
+                const geometry = new THREE.SphereGeometry(0.3);
+                const material = new THREE.MeshPhongMaterial({ color: color });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.set(x, y, z);
+                this.dx = (Math.random() - 0.5) * 2;
+                this.dy = (Math.random() - 0.5) * 2;
+                this.dz = (Math.random() - 0.5) * 2;
+                this.alpha = 1;
+                this.fadeSpeed = 0.02;
+                scene.add(this.mesh);
+            }
+
+            update() {
+                this.mesh.position.x += this.dx;
+                this.mesh.position.y += this.dy;
+                this.mesh.position.z += this.dz;
+                this.alpha -= this.fadeSpeed;
+                this.mesh.material.opacity = this.alpha;
+            }
+        }
+
+        class Ball {
+            constructor(x, y, z) {
+                const geometry = new THREE.SphereGeometry(2);
+                const color = new THREE.Color(`hsl(${Math.random() * 360}, 50%, 50%)`);
+                const material = new THREE.MeshPhongMaterial({ color: color });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.set(x, y, z);
+                this.radius = 2;
+                this.dx = (Math.random() - 0.5) * 2;
+                this.dy = 5;
+                this.dz = (Math.random() - 0.5) * 2;
+                this.gravity = -0.2;
+                this.friction = 0.8;
+                this.color = color;
+                scene.add(this.mesh);
+            }
+
+            update() {
+                // Apply gravity
+                this.dy += this.gravity;
+
+                // Update position
+                this.mesh.position.x += this.dx;
+                this.mesh.position.y += this.dy;
+                this.mesh.position.z += this.dz;
+
+                // Bounce off walls
+                if (Math.abs(this.mesh.position.x) > 48) {
+                    this.dx = -this.dx * this.friction;
+                    this.createCollisionParticles();
+                }
+
+                if (Math.abs(this.mesh.position.z) > 48) {
+                    this.dz = -this.dz * this.friction;
+                    this.createCollisionParticles();
+                }
+
+                // Bounce off floor
+                if (this.mesh.position.y < -18) {
+                    this.mesh.position.y = -18;
+                    this.dy = -this.dy * this.friction;
+                    this.createCollisionParticles();
+                }
+
+                // Ball-to-ball collisions
+                balls.forEach(otherBall => {
+                    if (otherBall === this) return;
+
+                    const dx = otherBall.mesh.position.x - this.mesh.position.x;
+                    const dy = otherBall.mesh.position.y - this.mesh.position.y;
+                    const dz = otherBall.mesh.position.z - this.mesh.position.z;
+                    const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                    if (distance < this.radius * 2) {
+                        // Simple collision response
+                        const nx = dx / distance;
+                        const ny = dy / distance;
+                        const nz = dz / distance;
+
+                        const relativeVelocityX = this.dx - otherBall.dx;
+                        const relativeVelocityY = this.dy - otherBall.dy;
+                        const relativeVelocityZ = this.dz - otherBall.dz;
+
+                        const impulse = -(relativeVelocityX * nx + relativeVelocityY * ny + relativeVelocityZ * nz);
+
+                        this.dx += nx * impulse * this.friction;
+                        this.dy += ny * impulse * this.friction;
+                        this.dz += nz * impulse * this.friction;
+                        otherBall.dx -= nx * impulse * this.friction;
+                        otherBall.dy -= ny * impulse * this.friction;
+                        otherBall.dz -= nz * impulse * this.friction;
+
+                        this.createCollisionParticles();
+                    }
+                });
+            }
+
+            createCollisionParticles() {
+                for (let i = 0; i < 5; i++) {
+                    particles.push(new Particle(
+                        this.mesh.position.x,
+                        this.mesh.position.y,
+                        this.mesh.position.z,
+                        this.color
+                    ));
+                }
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Update and remove faded particles
+            particles = particles.filter(particle => {
+                if (particle.alpha <= 0) {
+                    scene.remove(particle.mesh);
+                    return false;
+                }
+                particle.update();
+                return true;
+            });
+
+            // Update balls and remove stopped ones
+            balls = balls.filter(ball => {
+                ball.update();
+                if (Math.abs(ball.dy) < 0.1 && ball.mesh.position.y <= -18) {
+                    scene.remove(ball.mesh);
+                    return false;
+                }
+                return true;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // Add ball on click
+        renderer.domElement.addEventListener('click', (event) => {
+            const mouse = new THREE.Vector2(
+                (event.clientX / window.innerWidth) * 2 - 1,
+                -(event.clientY / window.innerHeight) * 2 + 1
+            );
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects([plane, backWall, leftWall, rightWall]);
+
+            if (intersects.length > 0) {
+                const point = intersects[0].point;
+                balls.push(new Ball(point.x, point.y, point.z));
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+
+</html>
