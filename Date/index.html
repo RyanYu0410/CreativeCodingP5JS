@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Clock</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    function setup() {
+      createCanvas(400, 400);
+      textSize(16);
+      textAlign(CENTER, CENTER);
+      angleMode(DEGREES);
+    }
+
+    function draw() {
+      background(240);
+
+      let hr = hour();
+      let mn = minute(); 
+      let sc = second();
+      let d = day();
+      let m = month();
+      let y = year();
+
+      // Draw clock face
+      translate(200, 200);
+      stroke(0);
+      strokeWeight(2);
+      fill(255);
+      circle(0, 0, 300);
+
+      // Draw hour numbers
+      push();
+      noStroke();
+      fill(0);
+      for(let i = 1; i <= 12; i++) {
+        let angle = map(i, 0, 12, -90, 270);
+        let x = cos(angle) * 120;
+        let y = sin(angle) * 120;
+        text(i, x, y);
+      }
+      pop();
+
+      // Draw date
+      push();
+      noStroke();
+      fill(0);
+      text(`${d}/${m}/${y}`, 0, 50);
+      pop();
+
+      // Draw digital time
+      push();
+      noStroke();
+      fill(0);
+      text(`${hr.toString().padStart(2, '0')}:${mn.toString().padStart(2, '0')}:${sc.toString().padStart(2, '0')}`, 0, -50);
+      pop();
+
+      // Draw clock hands
+      push();
+      rotate(-90); // Adjust rotation to start from 12 o'clock
+
+      // Hours
+      push();
+      stroke(0);
+      strokeWeight(4);
+      let hourAngle = map(hr % 12 + mn/60, 0, 12, 0, 360);
+      rotate(hourAngle);
+      line(0, 0, 80, 0);
+      pop();
+
+      // Minutes
+      push();
+      stroke(0);
+      strokeWeight(3);
+      let minuteAngle = map(mn + sc/60, 0, 60, 0, 360);
+      rotate(minuteAngle);
+      line(0, 0, 100, 0);
+      pop();
+
+      // Seconds
+      push();
+      stroke(255, 0, 0);
+      strokeWeight(2);
+      let secondAngle = map(sc, 0, 60, 0, 360);
+      rotate(secondAngle);
+      line(0, 0, 120, 0);
+      pop();
+
+      pop();
+
+      // Center dot
+      fill(255, 0, 0);
+      noStroke();
+      circle(0, 0, 10);
+    }
+  </script>
+</body>
+</html>

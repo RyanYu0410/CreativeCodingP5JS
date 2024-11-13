@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Symphony of Silicon</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            margin: 0;
+            color: #e1e1e1;
+            padding: 20px;
+        }
+
+        #chart-container {
+            width: 90%;
+            max-width: 1000px;
+            height: 60vh; /* Responsive height */
+            min-height: 300px; /* Minimum height */
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            position: relative; /* For proper chart sizing */
+            margin: 20px auto; /* Center and add spacing */
+        }
+
+        h2 {
+            font-size: clamp(1.5em, 4vw, 2.5em); /* Responsive font size */
+            text-align: center;
+            margin-bottom: 1.5em;
+            background: linear-gradient(45deg, #00ff88, #00a3ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 255, 136, 0.2);
+        }
+
+        canvas {
+            max-width: 100%;
+            height: 100% !important; /* Force canvas to fill container */
+            filter: drop-shadow(0 0 10px rgba(0, 255, 136, 0.2));
+        }
+
+        #year-display {
+            font-size: clamp(1em, 3vw, 1.5em); /* Responsive font size */
+            text-align: center;
+            margin: 1em 0;
+            color: #00ff88;
+        }
+
+        @media (max-width: 768px) {
+            #chart-container {
+                padding: 1rem;
+                height: 50vh;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            #chart-container {
+                width: 95%;
+                padding: 0.5rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h2>The Digital Revolution: Moore's Symphony</h2>
+    <div id="year-display">Year: 1971</div>
+    <div id="chart-container">
+        <canvas id="mooresLawChart"></canvas>
+    </div>
+
+    <script>
+        let table;
+        let currentYearIndex = 0;
+        let myChart;
+        let allYears = [];
+        let allTransistorCounts = [];
+
+        function preload() {
+            table = loadTable('moores_law_data.csv', 'csv', 'header');
+        }
+
+        function setup() {
+            noCanvas();
+            for (let i = 0; i < table.getRowCount(); i++) {
+                allYears.push(table.getNum(i, 'Year'));
+                allTransistorCounts.push(table.getNum(i, 'Transistor_Count'));
+            }
+            createChart();
+        }
+
+        function keyPressed() {
+            if (keyCode === UP_ARROW && currentYearIndex < allYears.length - 1) {
+                currentYearIndex++;
+                updateChart();
+            } else if (keyCode === DOWN_ARROW && currentYearIndex > 0) {
+                currentYearIndex--;
+                updateChart();
+            }
+        }
+
+        function updateChart() {
+            const years = allYears.slice(0, currentYearIndex + 1);
+            const transistorCounts = allTransistorCounts.slice(0, currentYearIndex + 1);
+            
+            document.getElementById('year-display').textContent = `Year: ${years[years.length-1]}`;
+            
+            myChart.data.labels = years;
+            myChart.data.datasets[0].data = transistorCounts;
+            myChart.update();
+        }
+
+        function createChart() {
+            const ctx = document.getElementById('mooresLawChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [allYears[0]],
+                    datasets: [{
+                        label: 'Digital Evolution',
+                        data: [allTransistorCounts[0]],
+                        backgroundColor: 'rgba(0, 255, 136, 0.2)',
+                        borderColor: 'rgba(0, 255, 136, 1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: 'rgba(0, 163, 255, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverRadius: 8,
+                        pointHoverBackgroundColor: 'rgba(0, 255, 136, 1)',
+                        pointHoverBorderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time\'s Arrow',
+                                color: '#e1e1e1',
+                                font: {
+                                    size: 14,
+                                    family: "'Segoe UI', sans-serif"
+                                }
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#e1e1e1'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Silicon Dreams',
+                                color: '#e1e1e1',
+                                font: {
+                                    size: 14,
+                                    family: "'Segoe UI', sans-serif"
+                                }
+                            },
+                            type: 'linear',
+                            min: 0,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: '#e1e1e1',
+                                callback: function (value) {
+                                    return value.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#e1e1e1',
+                                font: {
+                                    size: 14,
+                                    family: "'Segoe UI', sans-serif"
+                                }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleFont: {
+                                size: 14,
+                                family: "'Segoe UI', sans-serif"
+                            },
+                            bodyFont: {
+                                size: 13,
+                                family: "'Segoe UI', sans-serif"
+                            },
+                            callbacks: {
+                                label: function (tooltipItem) {
+                                    return `Transistors: ${tooltipItem.raw.toLocaleString()} dancing electrons`;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeInOutQuart'
+                    }
+                }
+            });
+        }
+
+        // Add event listener for keyboard controls
+        document.addEventListener('keydown', keyPressed);
+
+        // Add resize handler for responsive chart
+        window.addEventListener('resize', function() {
+            if (myChart) {
+                myChart.resize();
+            }
+        });
+    </script>
+</body>
+
+</html>

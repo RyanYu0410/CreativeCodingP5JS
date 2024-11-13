@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather-Based Bar Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            max-width: 100%;
+            height: auto;
+        }
+        #weather-info {
+            margin: 20px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            max-width: 90%;
+            width: 800px;
+        }
+        #current-data {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .slider-container {
+            margin: 10px 0;
+            display: none;
+        }
+        .slider-container.show {
+            display: block;
+        }
+        .mode-switch {
+            margin: 10px;
+            padding: 8px 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="weather-info">
+        <h2>Current Weather Visualization</h2>
+        <button class="mode-switch" onclick="toggleMode()">Switch Mode</button>
+        <p>Location: <span id="location">Detecting...</span></p>
+        <p>The background color changes based on temperature:</p>
+        <ul>
+            <li>Cooler temperatures (below 0°C) - More blue tint</li>
+            <li>Warmer temperatures (above 30°C) - More orange-red tint</li>
+        </ul>
+        <p>The bars rotate based on wind direction and have dynamic textures!</p>
+        <div id="current-data">
+            <p>Temperature: <span id="temp">Loading...</span>°C</p>
+            <p>Precipitation: <span id="precip">Loading...</span> mm</p>
+            <p>Wind Speed: <span id="wind">Loading...</span> km/h</p>
+        </div>
+        <div id="sliders" class="slider-container">
+            <div>
+                <label for="tempSlider">Temperature (-10°C to 40°C):</label>
+                <input type="range" id="tempSlider" min="-10" max="40" value="20" step="0.1">
+            </div>
+            <div>
+                <label for="precipSlider">Precipitation (0-10mm):</label>
+                <input type="range" id="precipSlider" min="0" max="10" value="0" step="0.1">
+            </div>
+            <div>
+                <label for="windSpeedSlider">Wind Speed (0-100 km/h):</label>
+                <input type="range" id="windSpeedSlider" min="0" max="100" value="10" step="0.1">
+            </div>
+            <div>
+                <label for="windDirSlider">Wind Direction (0-360°):</label>
+                <input type="range" id="windDirSlider" min="0" max="360" value="0" step="1">
+            </div>
+        </div>
+    </div>
+    <script>
+        let bars = [];
+        let numBars = 30;
+        let weatherData;
+        let lastUpdate = 0;
+        let latitude, longitude;
+        let noiseOffset = 0;
+        let rotationOffset = 0;
+        const updateInterval = 5000;
+        let isApiMode = true;
+        let canvas;
+
+        function windowResized() {
+            let canvasWidth = min(windowWidth * 0.9, 800);
+            let canvasHeight = min(windowHeight * 0.6, 600);
+            resizeCanvas(canvasWidth, canvasHeight);
+            
+            // Recalculate bar positions
+            bars = [];
+            let spacing = width / (numBars + 1);
+            for (let i = 0; i < numBars; i++) {
+                for (let j = 0; j < numBars/1.5; j++) {
+                    let x = spacing * (i + 1);
+                    let y = spacing * (j + 1);
+                    bars.push(new Bar(createVector(x, y)));
+                }
+            }
+        }
+
+        function toggleMode() {
+            isApiMode = !isApiMode;
+            const sliders = document.getElementById('sliders');
+            const locationText = document.getElementById('location');
+            
+            if (isApiMode) {
+                sliders.classList.remove('show');
+                locationText.textContent = 'Detecting...';
+                getLocation();
+            } else {
+                sliders.classList.add('show');
+                locationText.textContent = 'Manual Control Mode';
+                updateFromSliders();
+            }
+        }
+
+        function updateFromSliders() {
+            if (!isApiMode) {
+                weatherData = {
+                    current: {
+                        temperature_2m: parseFloat(document.getElementById('tempSlider').value),
+                        precipitation: parseFloat(document.getElementById('precipSlider').value),
+                        windspeed_10m: parseFloat(document.getElementById('windSpeedSlider').value),
+                        winddirection_10m: parseFloat(document.getElementById('windDirSlider').value)
+                    }
+                };
+                
+                document.getElementById('temp').textContent = weatherData.current.temperature_2m.toFixed(1);
+                document.getElementById('precip').textContent = weatherData.current.precipitation.toFixed(1);
+                document.getElementById('wind').textContent = weatherData.current.windspeed_10m.toFixed(1);
+            }
+        }
+
+        function setup() {
+            let canvasWidth = min(windowWidth * 0.9, 800);
+            let canvasHeight = min(windowHeight * 0.6, 600);
+            canvas = createCanvas(canvasWidth, canvasHeight);
+            angleMode(RADIANS);
+            rectMode(CENTER);
+            
+            let spacing = width / (numBars + 1);
+            for (let i = 0; i < numBars; i++) {
+                for (let j = 0; j < numBars/1.5; j++) {
+                    let x = spacing * (i + 1);
+                    let y = spacing * (j + 1);
+                    bars.push(new Bar(createVector(x, y)));
+                }
+            }
+            getLocation();
+
+            // Add event listeners for sliders
+            const sliders = ['tempSlider', 'precipSlider', 'windSpeedSlider', 'windDirSlider'];
+            sliders.forEach(slider => {
+                document.getElementById(slider).addEventListener('input', updateFromSliders);
+            });
+        }
+
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    latitude = position.coords.latitude;
+                    longitude = position.coords.longitude;
+                    document.getElementById('location').textContent = 
+                        `${latitude.toFixed(4)}°N, ${longitude.toFixed(4)}°W`;
+                    fetchWeatherData();
+                }, error => {
+                    console.error('Error getting location:', error);
+                    latitude = 40.7128;
+                    longitude = -74.0060;
+                    document.getElementById('location').textContent = 
+                        'New York City (40.7128°N, 74.0060°W)';
+                    fetchWeatherData();
+                });
+            } else {
+                console.error('Geolocation is not supported by this browser');
+                latitude = 40.7128;
+                longitude = -74.0060;
+                document.getElementById('location').textContent = 
+                    'New York City (40.7128°N, 74.0060°W)';
+                fetchWeatherData();
+            }
+        }
+
+        async function fetchWeatherData() {
+            if (!isApiMode) return;
+            try {
+                const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,precipitation,windspeed_10m,winddirection_10m`);
+                weatherData = await response.json();
+            } catch (error) {
+                console.error('Error fetching weather data:', error);
+            }
+        }
+
+        function draw() {
+            if (isApiMode && millis() - lastUpdate > updateInterval) {
+                fetchWeatherData();
+                lastUpdate = millis();
+            }
+
+            background(240);
+            if (weatherData && weatherData.current) {
+                let temperature = weatherData.current.temperature_2m;
+                let precipitation = weatherData.current.precipitation;
+                let windspeed = weatherData.current.windspeed_10m;
+                let windDirection = weatherData.current.winddirection_10m || 0;
+                
+                if (isApiMode) {
+                    document.getElementById('temp').textContent = temperature.toFixed(1);
+                    document.getElementById('precip').textContent = precipitation.toFixed(1);
+                    document.getElementById('wind').textContent = windspeed.toFixed(1);
+                }
+                
+                // Changed background color mapping to go from blue to orange-red
+                let r = map(temperature, -10, 40, 100, 255);
+                let g = map(temperature, -10, 40, 150, 100);
+                let b = map(temperature, -10, 40, 255, 0);
+                background(r, g, b);
+                
+                // Make rotation speed dependent on wind speed
+                noiseOffset += 0.02 * (windspeed / 50);
+                rotationOffset += 0.005 * (windspeed / 50);
+                
+                for (let i = 0; i < bars.length; i++) {
+                    let bar = bars[i];
+                    bar.length = map(precipitation, 0, 10, 20, 50);
+                    let individualRotation = noise(bar.position.x * 0.01, bar.position.y * 0.01, noiseOffset) * TWO_PI;
+                    bar.rotation = radians(windDirection) + individualRotation + rotationOffset;
+                    bar.display();
+                }
+            }
+        }
+
+        class Bar {
+            constructor(position) {
+                this.position = position;
+                this.length = 30;
+                this.width = 6;
+                this.rotation = 0;
+            }
+
+            display() {
+                push();
+                translate(this.position.x, this.position.y);
+                rotate(this.rotation);
+                
+                noStroke();
+                let baseHue = map(noise(this.position.x * 0.01, this.position.y * 0.01, noiseOffset), 0, 1, 100, 200);
+                fill(baseHue, 150, 255, 200);
+                rect(0, 0, this.width, this.length);
+                
+                for(let i = -this.width/2; i < this.width/2; i += 1) {
+                    for(let j = -this.length/2; j < this.length/2; j += 1) {
+                        let noiseVal = noise(
+                            i * 0.2, 
+                            j * 0.2, 
+                            noiseOffset + this.position.x * 0.01
+                        );
+                        let alpha = map(noiseVal, 0, 1, 30, 200);
+                        let hue = map(noiseVal, 0, 1, baseHue - 50, baseHue + 50);
+                        fill(hue, 150, 255, alpha);
+                        rect(i, j, 1, 1);
+                    }
+                }
+                pop();
+            }
+        }
+    </script>
+</body>
+</html>
