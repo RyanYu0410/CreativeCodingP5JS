@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>3D OBJ Viewer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <script>
+    let miyuModel;
+    let hairTex, bodyTex, faceTex, clothTex, miscTex, weaponTex;
+    let rotX = 0;
+    let rotY = 0;
+    let zoom = -200;
+
+    function preload() {
+      miyuModel = loadModel('Miyu_Akey_Rigging.obj', true);
+      hairTex = loadImage('Hair.png');
+      bodyTex = loadImage('Character_Body.png');
+      faceTex = loadImage('Character_Face.png');
+      clothTex = loadImage('Cloth.png');
+      miscTex = loadImage('Misc.png');
+      weaponTex = loadImage('Weapon.png');
+    }
+
+    function setup() {
+      createCanvas(windowWidth, windowHeight, WEBGL);
+      setAttributes('antialias', true);
+      setAttributes('perPixelLighting', true);
+      
+      // Set perspective with larger far clipping plane
+      perspective(PI/3.0, width/height, 1, 100000);
+    }
+
+    function draw() {
+      background(200);
+      
+      // Set lighting
+      ambientLight(120);
+      directionalLight(200, 200, 200, 0, 1, -1);
+      
+      // Camera position
+      camera(0, -100, zoom, 0, 0, 0, 0, 1, 0);
+      
+      // Object rotation
+      rotateX(rotX);
+      rotateY(rotY);
+      
+      // Draw model
+      noStroke();
+      scale(50);
+      
+      // Apply materials in sequence
+      texture(hairTex);
+      model(miyuModel);
+      
+      texture(bodyTex);
+      model(miyuModel);
+      
+      texture(faceTex);
+      model(miyuModel);
+      
+      texture(clothTex);
+      model(miyuModel);
+      
+      texture(miscTex);
+      model(miyuModel);
+      
+      texture(weaponTex);
+      model(miyuModel);
+      
+      shininess(50);
+      
+      // Update rotation based on mouse drag
+      if (mouseIsPressed) {
+        rotY += (mouseX - pmouseX) * 0.01;
+        rotX += (mouseY - pmouseY) * 0.01;
+      }
+    }
+
+    function mouseWheel(event) {
+      // Zoom with mouse wheel
+      zoom += event.delta;
+      return false;
+    }
+
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+    }
+  </script>
+</body>
+</html>
