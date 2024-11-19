@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MMD Demo with Slider</title>
+    <link rel="icon" href="favicon.ico">
     <style>
         body {
             margin: 0;
@@ -15,110 +16,237 @@
             display: block;
         }
 
-        #slider-container {
-            position: absolute;
-            bottom: 10px;
-            left: 10px;
-            right: 10px;
-            text-align: center;
-            z-index: 10;
+        #title {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 4em;
+            color: white;
+            font-family: "Microsoft YaHei", sans-serif;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            opacity: 0;
+            pointer-events: none;
+            animation: titleFade 5s ease-in-out forwards;
+            background: linear-gradient(120deg, #ffffff 0%, #89cff0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 0.1em;
         }
 
-        #slider {
-            width: 80%;
+        @keyframes titleFade {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+                filter: blur(10px);
+            }
+            20% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+                filter: blur(0);
+            }
+            80% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+                filter: blur(0);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(1.2);
+                filter: blur(10px);
+            }
         }
     </style>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.150.0/build/three.module.js"
+        }
+    }
+    </script>
+    <!-- Update CSP to allow WebSocket, data URLs and local resources -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://unpkg.com ws://127.0.0.1:* http://127.0.0.1:* https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data: http://127.0.0.1:* https://unpkg.com; media-src 'self';">
 </head>
 
 <body>
-    <div id="slider-container">
-        <input type="range" id="slider" min="0" max="1" step="0.001" value="0">
-    </div>
+    <div id="title">霜雪千年</div>
+    <audio id="bgMusic" src="videoplayback.mp3" autoplay></audio>
+    <script src="https://cdn.jsdelivr.net/npm/ammo.js@1.0.12/ammo.js"></script>
     <script type="module">
-        import * as THREE from 'https://cdn.skypack.dev/three';
-        import { OrbitControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/OrbitControls.js';
-        import { MMDLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/MMDLoader.js';
-        import { MMDAnimationHelper } from 'https://cdn.skypack.dev/three/examples/jsm/animation/MMDAnimationHelper.js';
+        import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.150.0/examples/jsm/controls/OrbitControls.js';
+        import { MMDLoader } from 'https://unpkg.com/three@0.150.0/examples/jsm/loaders/MMDLoader.js';
+        import { MMDAnimationHelper } from 'https://unpkg.com/three@0.150.0/examples/jsm/animation/MMDAnimationHelper.js';
 
-        // 创建场景、相机和渲染器
+        // Create scene, camera and renderer
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
-        camera.position.set(0, 10, 30);
+        camera.position.set(0, 10, 50);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        // Enable shadow rendering
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // Increase tone mapping exposure for brighter scene
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.15; // Increased from 0.9
         document.body.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
 
-        // 灯光
-        const light = new THREE.AmbientLight(0xffffff, 0.5);
+        // Lighting - increased intensity
+        const light = new THREE.AmbientLight(0xffffff, 0.8); // Increased from 0.4
         scene.add(light);
 
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 2); // Increased from 0.8
         directionalLight.position.set(10, 20, 10);
+        directionalLight.castShadow = true;
+        // Configure shadow properties
+        directionalLight.shadow.mapSize.width = 2048;
+        directionalLight.shadow.mapSize.height = 2048;
+        directionalLight.shadow.camera.near = 0.5;
+        directionalLight.shadow.camera.far = 500;
+        directionalLight.shadow.camera.left = -50;
+        directionalLight.shadow.camera.right = 50;
+        directionalLight.shadow.camera.top = 50;
+        directionalLight.shadow.camera.bottom = -50;
         scene.add(directionalLight);
 
-        // 动画辅助工具
-        const helper = new MMDAnimationHelper();
+        // Add hemisphere light for better color balance
+        const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 2);
+        scene.add(hemisphereLight);
 
-        // 加载 MMD 模型和动作
+        // Add spotlights with shadows
+        const spotLight1 = new THREE.SpotLight(0xff7f00, 0.8);
+        spotLight1.position.set(-20, 30, 20);
+        spotLight1.angle = Math.PI / 6;
+        spotLight1.penumbra = 0.3;
+        spotLight1.castShadow = true;
+        spotLight1.shadow.mapSize.width = 1024;
+        spotLight1.shadow.mapSize.height = 1024;
+        scene.add(spotLight1);
+
+        const spotLight2 = new THREE.SpotLight(0x00ffff, 2);
+        spotLight2.position.set(20, 30, 20);
+        spotLight2.angle = Math.PI / 6;
+        spotLight2.penumbra = 0.3;
+        spotLight2.castShadow = true;
+        spotLight2.shadow.mapSize.width = 1024;
+        spotLight2.shadow.mapSize.height = 1024;
+        scene.add(spotLight2);
+
+        const spotLight3 = new THREE.SpotLight(0xff00ff, 2);
+        spotLight3.position.set(0, 30, -20);
+        spotLight3.angle = Math.PI / 6;
+        spotLight3.penumbra = 0.3;
+        spotLight3.castShadow = true;
+        spotLight3.shadow.mapSize.width = 1024;
+        spotLight3.shadow.mapSize.height = 1024;
+        scene.add(spotLight3);
+
+        // Animation helper with physics enabled
+        const helper = new MMDAnimationHelper({
+            physics: true // Enable physics simulation
+        });
+
+        // Load MMD model and animations
         const loader = new MMDLoader();
 
         let mixer, clock = new THREE.Clock();
         let animationDuration = 0;
+        const audio = document.getElementById('bgMusic');
 
+        // Load stage/scene first
         loader.load(
-            // 模型路径
-            'path/to/your/model.pmx',
+            '云蜃马戏团·有识月·H2CU式stage12-1_by_H2Cu阿相_efccb94a925cbee60cbf3254a017adac/场景.pmx',
+            (stage) => {
+                console.log('Stage loaded successfully');
+                stage.position.y = -15.5; // Changed from -10 to -15 to lower theZ scene
+                stage.receiveShadow = true; // Enable receiving shadows
+                scene.add(stage);
+            },
+            (xhr) => {
+                console.log((xhr.loaded / xhr.total * 100) + '% stage loaded');
+            },
+            (error) => {
+                console.error('Error loading stage:', error);
+            }
+        );
+
+        // Add error handling for model loading
+        loader.load(
+            // Model path
+            'Sour式改变Magical Mirai 2019/Sour Magical Mirai 2019 ver1.5.pmx',
             (mesh) => {
-                mesh.position.y = -10;
+                console.log('Model loaded successfully');
+                mesh.position.y = -15.5; // Changed from -10 to -15 to match stage position
+                mesh.castShadow = true; // Enable casting shadows
+                mesh.receiveShadow = true; // Enable receiving shadows
                 scene.add(mesh);
 
-                // 加载动作
+                // Load model animation
                 loader.loadAnimation('MModel.vmd', mesh, (vmd) => {
+                    console.log('Model animation loaded successfully');
                     helper.add(mesh, {
                         animation: vmd,
-                        physics: false,
+                        physics: true // Enable physics for this model
                     });
 
                     mixer = helper.objects.get(mesh).mixer;
                     animationDuration = vmd.duration;
+                    console.log('Animation duration:', animationDuration);
 
-                    // 加载镜头动画
-                    loader.loadAnimation('MCam.vmd', camera, (camAnim) => {
-                        helper.add(camera, {
-                            animation: camAnim,
-                        });
-                    });
-
-                    // 监听滑块变化
-                    const slider = document.getElementById('slider');
-                    slider.max = animationDuration;
-
-                    slider.addEventListener('input', (event) => {
-                        const time = parseFloat(event.target.value);
-                        if (mixer) mixer.setTime(time);
-                        if (helper.objects.get(camera)?.mixer) helper.objects.get(camera).mixer.setTime(time);
-                    });
+                    // Start animation and music
+                    audio.play();
+                },
+                // Error callback for model animation
+                (error) => {
+                    console.error('Error loading model animation:', error);
                 });
+            },
+            // Progress callback
+            (xhr) => {
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            // Error callback for model
+            (error) => {
+                console.error('Error loading model:', error);
             }
         );
 
-        // 动画循环
+        // Animation loop
         function animate() {
             requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            if (helper) helper.update(delta);
-            renderer.render(scene, camera);
+            try {
+                const delta = clock.getDelta();
+                if (helper) helper.update(delta);
+                renderer.render(scene, camera);
+            } catch (error) {
+                console.error('Error in animation loop:', error);
+            }
         }
         animate();
 
-        // 窗口大小调整
+        // Window resize handler
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            try {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            } catch (error) {
+                console.error('Error handling window resize:', error);
+            }
+        });
+
+        // Add error handling for WebGL
+        if (!renderer.capabilities.isWebGL2) {
+            console.warn('WebGL 2 is not available. Using WebGL 1.');
+        }
+        
+        // Handle general errors
+        window.addEventListener('error', (event) => {
+            console.error('Global error:', event.error);
         });
     </script>
 </body>
