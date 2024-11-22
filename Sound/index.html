@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        let sound;
+        let sound1;
+        let amp;
+        let delay;
+        let reverb;
+        let fft;
+
+        let targetWidth, targetHeight;
+        let resizeSpeed = 0.1;
+        let smoothedLevel = 0;
+        let levelSmoothing = 0.1;
+        let raindrops = [];
+        let time = 0;
+
+        function preload() {
+            sound = loadSound('/y2mate_5gbydy1.mp3');
+            sound1 = loadSound('/vine-boom.mp3');
+        }
+
+        function setup() {
+            targetWidth = windowWidth;
+            targetHeight = windowHeight;
+            createCanvas(targetWidth, targetHeight);
+
+            amp = new p5.Amplitude();
+            delay = new p5.Delay();
+            reverb = new p5.Reverb();
+            fft = new p5.FFT();
+
+            sound.disconnect();
+            sound.connect(delay);
+            delay.connect(reverb);
+
+            delay.delayTime(0.25);
+            delay.feedback(0.7);
+            reverb.drywet(0.5);
+
+            sound.loop();
+        }
+
+        function draw() {
+            let currentWidth = lerp(width, targetWidth, resizeSpeed);
+            let currentHeight = lerp(height, targetHeight, resizeSpeed);
+            resizeCanvas(currentWidth, currentHeight, true);
+
+            background(0);
+
+            let level = amp.getLevel();
+            smoothedLevel = lerp(smoothedLevel, level, levelSmoothing);
+            time += 0.01;
+
+            // Draw rain based on spectrum with more interesting distribution
+            let spectrum = fft.analyze();
+            
+            // Create a grid of rain across the window
+            let gridCols = 20;
+            let gridRows = 15;
+            let cellWidth = width / gridCols;
+            let cellHeight = height / gridRows;
+            
+            for (let col = 0; col < gridCols; col++) {
+                for (let row = 0; row < gridRows; row++) {
+                    // Sample from spectrum based on position
+                    let spectrumIndex = Math.floor(map(col + row * gridCols, 0, gridCols * gridRows, 0, spectrum.length));
+                    let spectrumValue = spectrum[spectrumIndex];
+                    
+                    let x = col * cellWidth;
+                    let y = row * cellHeight;
+                    
+                    let intensity = map(spectrumValue, 0, 255, 0, 8);
+                    
+                    // Create raindrop lines with varying opacity and thickness
+                    let alpha = map(spectrumValue, 0, 255, 50, 255);
+                    let weight = map(spectrumValue, 0, 255, 0.5, 2);
+                    stroke(255, alpha);
+                    strokeWeight(weight);
+                    
+                    // Vary rain length based on both spectrum and position
+                    let baseRainLength = map(spectrumValue, 0, 255, 1500, 100); // Increased rain length range
+                    let positionFactor = sin(x * 0.01 + time) * 100; // Increased position factor
+                    let rainLength = baseRainLength + positionFactor;
+                    
+                    // Create rain in each cell
+                    for (let j = 0; j < intensity; j++) {
+                        let cluster = sin(x * 0.02 + time * 2) * (cellWidth / 4);
+                        let xPos = x + random(0, cellWidth);
+                        let yPos = y + random(0, cellHeight);
+                        let rainAngle = map(sin(x * 0.005 + time), -1, 1, -2, 2); // Increased angle range
+                        line(xPos, yPos, xPos + rainAngle, yPos + rainLength);
+                    }
+                }
+            }
+
+            // Draw puddle ripples
+            noFill();
+            stroke(255, 100);
+            let numRipples = 5;
+            for (let i = 0; i < numRipples; i++) {
+                let rippleSize = map(smoothedLevel, 0, 0.5, 20, 600) * (i / numRipples); // Increased ripple size
+                ellipse(width / 2, height - 50, rippleSize, rippleSize * 0.3);
+            }
+
+            // Draw ground reflection
+            fill(0, 150);
+            noStroke();
+            rect(0, height, width, 60); // Increased reflection height
+            
+            // Keep the amplitude visualization
+            fill(255);
+            ellipse(width / 2, height / 2, map(smoothedLevel, 0, 0.5, 20, 600)); // Increased visualization size
+
+            delay.delayTime(map(mouseX, 0, width, 0, 0.2));
+        }
+
+        function mousePressed() {
+            sound.play();
+        }
+
+        function windowResized() {
+            targetWidth = windowWidth;
+            targetHeight = windowHeight;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Oscillator</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #000;
+        }
+        canvas {
+            border: 1px solid #333;
+        }
+        #fileNameDisplay {
+            color: white;
+            position: absolute;
+            bottom: 70px;
+            right: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="fileNameDisplay"></div>
+    <script>
+        let osc, fft;
+        let playing = false;
+        let freq = 440;
+        let amp = 0.5;
+        let ballX, ballY;
+        let controlAreaWidth = 200;
+        let controlAreaHeight = 200;
+        let isDragging = false;
+        let currentNote = 0;
+        let noteInterval;
+        let importedSound;
+        let midiFile;
+
+        // Define some famous melodies
+        const melodies = {
+            'twinkleStar': [
+                {freq: 262, duration: 500}, // C4 - Twin
+                {freq: 262, duration: 500}, // C4 - kle
+                {freq: 392, duration: 500}, // G4 - twin
+                {freq: 392, duration: 500}, // G4 - kle
+                {freq: 440, duration: 500}, // A4 - lit
+                {freq: 440, duration: 500}, // A4 - tle
+                {freq: 392, duration: 1000}, // G4 - star
+            ],
+            'happyBirthday': [
+                {freq: 262, duration: 500}, // C4 - Hap
+                {freq: 262, duration: 500}, // C4 - py
+                {freq: 294, duration: 1000}, // D4 - Birth
+                {freq: 262, duration: 1000}, // C4 - day
+                {freq: 349, duration: 1000}, // F4 - to
+                {freq: 330, duration: 2000}, // E4 - you
+            ]
+        };
+
+        function preload() {
+            importedSound = loadSound('/y2mate_5gbydy1.mp3');
+        }
+
+        function setup() {
+            createCanvas(800, 600);
+            
+            // Create oscillator and FFT
+            osc = new p5.Oscillator('sine');
+            fft = new p5.FFT();
+            
+            // Initialize ball position
+            ballX = map(freq, 100, 1200, 20, controlAreaWidth - 20);
+            ballY = map(amp, 0, 1, controlAreaHeight - 20, 20);
+            
+            // Create waveform buttons
+            createButton('Sine').position(20, height - 40).mousePressed(() => osc.setType('sine'));
+            createButton('Square').position(80, height - 40).mousePressed(() => osc.setType('square'));
+            createButton('Triangle').position(150, height - 40).mousePressed(() => osc.setType('triangle'));
+            createButton('Sawtooth').position(220, height - 40).mousePressed(() => osc.setType('sawtooth'));
+
+            // Create melody buttons
+            createButton('Twinkle Star').position(320, height - 40).mousePressed(() => playMelody('twinkleStar'));
+            createButton('Happy Birthday').position(420, height - 40).mousePressed(() => playMelody('happyBirthday'));
+            createButton('Play Imported').position(520, height - 40).mousePressed(playImportedMusic);
+            
+            // Create MIDI file input and button
+            let midiInput = createFileInput(handleMidiFile, 'midi');
+            midiInput.position(620, height - 40);
+            createButton('Play MIDI').position(720, height - 40).mousePressed(playMidiFile);
+        }
+
+        function handleMidiFile(file) {
+            if (file.type === 'audio/midi' || file.type === 'audio/mid' || file.subtype === 'midi') {
+                midiFile = file;
+                document.getElementById('fileNameDisplay').textContent = 'Selected file: ' + file.name;
+                console.log('MIDI file loaded:', file); // Debug log
+            } else {
+                console.log('Please upload a MIDI file');
+                document.getElementById('fileNameDisplay').textContent = 'Please select a MIDI file';
+            }
+        }
+
+        function playMidiFile() {
+            if (!midiFile) {
+                console.log('No MIDI file loaded');
+                document.getElementById('fileNameDisplay').textContent = 'No MIDI file loaded';
+                return;
+            }
+
+            // Stop any currently playing sounds
+            if (playing) {
+                osc.stop();
+                playing = false;
+            }
+            if (noteInterval) {
+                clearInterval(noteInterval);
+            }
+
+            // Create a FileReader to read the MIDI file
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                console.log('FileReader loaded:', e.target.result); // Debug log
+                let midiData = new Uint8Array(e.target.result);
+                parseMidiData(midiData);
+            };
+            reader.onerror = function(e) {
+                console.error('FileReader error:', e); // Debug log
+            };
+            reader.readAsArrayBuffer(midiFile.file);
+        }
+
+        function parseMidiData(data) {
+            console.log('Parsing MIDI data, length:', data.length); // Debug log
+            
+            let notes = [];
+            let tempo = 500; // Default tempo (500ms per note)
+            
+            for (let i = 0; i < data.length - 2; i++) {
+                // Look for tempo meta event
+                if (data[i] === 0xFF && data[i + 1] === 0x51) {
+                    let tempoBytes = data.slice(i + 3, i + 6);
+                    tempo = (tempoBytes[0] << 16) | (tempoBytes[1] << 8) | tempoBytes[2];
+                    tempo = Math.floor(tempo / 1000); // Convert to milliseconds
+                }
+                
+                // Note On event
+                if ((data[i] & 0xF0) === 0x90 && data[i + 2] > 0) {
+                    let note = data[i + 1];
+                    let velocity = data[i + 2];
+                    let freq = 440 * Math.pow(2, (note - 69) / 12);
+                    notes.push({
+                        freq: freq,
+                        duration: tempo,
+                        amp: velocity / 127
+                    });
+                    console.log('Found note:', freq, 'Hz'); // Debug log
+                }
+            }
+            
+            console.log('Parsed notes:', notes.length); // Debug log
+            
+            if (notes.length > 0) {
+                currentNote = 0;
+                osc.start();
+                playing = true;
+                
+                function playNextMidiNote() {
+                    if (currentNote >= notes.length) {
+                        clearInterval(noteInterval);
+                        osc.stop();
+                        playing = false;
+                        return;
+                    }
+                    
+                    let note = notes[currentNote];
+                    console.log('Playing note:', note.freq, 'Hz'); // Debug log
+                    osc.freq(note.freq);
+                    osc.amp(note.amp);
+                    currentNote++;
+                }
+                
+                playNextMidiNote();
+                noteInterval = setInterval(playNextMidiNote, tempo);
+            } else {
+                console.log('No notes found in MIDI file'); // Debug log
+            }
+        }
+
+        function playImportedMusic() {
+            if (importedSound.isPlaying()) {
+                importedSound.stop();
+            } else {
+                importedSound.play();
+            }
+        }
+
+        function playMelody(melodyName) {
+            // Stop any currently playing melody
+            if (noteInterval) {
+                clearInterval(noteInterval);
+            }
+            if (playing) {
+                osc.stop();
+            }
+            
+            currentNote = 0;
+            const melody = melodies[melodyName];
+            
+            osc.start();
+            playing = true;
+            
+            function playNextNote() {
+                if (currentNote >= melody.length) {
+                    clearInterval(noteInterval);
+                    osc.stop();
+                    playing = false;
+                    return;
+                }
+                
+                const note = melody[currentNote];
+                osc.freq(note.freq);
+                currentNote++;
+            }
+            
+            playNextNote();
+            noteInterval = setInterval(playNextNote, melody[0].duration);
+        }
+
+        function draw() {
+            background(0);
+            
+            // Draw control area
+            stroke(100);
+            noFill();
+            rect(20, height - 260, controlAreaWidth, controlAreaHeight);
+            
+            // Draw axes labels
+            fill(255);
+            noStroke();
+            text('Frequency', 20, height - 270);
+            push();
+            translate(10, height - 160);
+            rotate(-PI/2);
+            text('Amplitude', 0, 0);
+            pop();
+            
+            // Update ball position if dragging
+            if (isDragging && mouseX >= 20 && mouseX <= 20 + controlAreaWidth &&
+                mouseY >= height - 260 && mouseY <= height - 260 + controlAreaHeight) {
+                ballX = constrain(mouseX - 20, 0, controlAreaWidth);
+                ballY = constrain(mouseY - (height - 260), 0, controlAreaHeight);
+                
+                // Update oscillator parameters
+                freq = map(ballX, 0, controlAreaWidth, 100, 1200);
+                amp = map(ballY, controlAreaHeight, 0, 0, 1);
+                osc.freq(freq);
+                osc.amp(amp);
+            }
+            
+            // Draw ball
+            fill(0, 255, 0);
+            noStroke();
+            ellipse(ballX + 20, ballY + height - 260, 15, 15);
+            
+            // Draw waveform
+            let waveform = fft.waveform();
+            stroke(0, 255, 0);
+            noFill();
+            beginShape();
+            for (let i = 0; i < waveform.length; i++) {
+                let x = map(i, 0, waveform.length, 0, width);
+                let y = map(waveform[i], -1, 1, height/2 - 100, height/2 + 100);
+                vertex(x, y);
+            }
+            endShape();
+            
+            // Draw frequency and amplitude text
+            fill(255);
+            noStroke();
+            text('Frequency: ' + Math.round(freq) + ' Hz', 240, height - 220);
+            text('Amplitude: ' + amp.toFixed(2), 240, height - 200);
+        }
+
+        function mousePressed() {
+            // Check if click is within control area
+            if (mouseX >= 20 && mouseX <= 20 + controlAreaWidth &&
+                mouseY >= height - 260 && mouseY <= height - 260 + controlAreaHeight) {
+                isDragging = true;
+            } else if (mouseY < height - 300) {
+                if (!playing) {
+                    osc.start();
+                    playing = true;
+                } else {
+                    osc.stop();
+                    playing = false;
+                }
+            }
+        }
+
+        function mouseReleased() {
+            isDragging = false;
+        }
+    </script>
+</body>
+</html>
