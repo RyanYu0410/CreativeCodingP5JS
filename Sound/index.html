@@ -94,7 +94,7 @@
                     strokeWeight(weight);
                     
                     // Vary rain length based on both spectrum and position
-                    let baseRainLength = map(spectrumValue, 0, 255, 1500, 100); // Increased rain length range
+                    let baseRainLength = map(spectrumValue, 0, 255, 1500, 0); // Increased rain length range
                     let positionFactor = sin(x * 0.01 + time) * 100; // Increased position factor
                     let rainLength = baseRainLength + positionFactor;
                     

@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script type="importmap">
+        {
+            "imports": {
+                    "three": "https://unpkg.com/three@0.150.0/build/three.module.js"
+                }
+            }
+        </script>
+        <!-- Update CSP to allow WebSocket, data URLs, blobs and local resources -->
+        <meta http-equiv="Content-Security-Policy"
+            content="default-src 'self' https://unpkg.com ws://127.0.0.1:* http://127.0.0.1:* https://cdn.jsdelivr.net https://cdnjs.cloudflare.com blob:; connect-src 'self' blob: https://unpkg.com ws://127.0.0.1:* http://127.0.0.1:* https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: http://127.0.0.1:* https://unpkg.com; media-src 'self' blob:;">
+
+    <title>Three.js and p5.js Integration</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.min.js"></script>
+    <script type="module">
+        import * as THREE from 'https://unpkg.com/three@0.150.0/build/three.module.js';
+        import { OrbitControls } from 'https://unpkg.com/three@0.150.0/examples/jsm/controls/OrbitControls.js';
+        import { GLTFLoader } from 'https://unpkg.com/three@0.150.0/examples/jsm/loaders/GLTFLoader.js';
+
+        console.log('Starting Three.js application...');
+
+        let scene, camera, renderer, model, mixer;
+        let lastTime = 0;
+        const targetFrameRate = 60;
+        const frameInterval = 1000 / targetFrameRate;
+        let animations = [];
+        let currentActions = {};
+        let keysPressed = {};
+        let skeleton;
+        let currentAnimation = null;
+
+        console.log('Initializing variables...');
+
+        init();
+        animate();
+
+        function init() {
+            console.log('Initializing scene...');
+            // Scene setup with basic background
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xa0a0a0);
+            
+            console.log('Setting up camera...');
+            // Camera setup with improved parameters
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
+            camera.position.set(0, 2, 5); // Better initial position
+            camera.lookAt(0, 1, 0); // Look at character's center
+            
+            console.log('Configuring renderer...');
+            // High-quality renderer setup
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                powerPreference: "high-performance",
+                alpha: true,
+                stencil: true
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            document.body.appendChild(renderer.domElement);
+
+            console.log('Setting up lights...');
+            // Enhanced lighting setup
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
+            hemiLight.position.set(0, 20, 0);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(3, 10, 10);
+            dirLight.castShadow = true;
+            dirLight.shadow.camera.top = 4;
+            dirLight.shadow.camera.bottom = -4;
+            dirLight.shadow.camera.left = -4;
+            dirLight.shadow.camera.right = 4;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            dirLight.shadow.bias = -0.0001;
+            scene.add(dirLight);
+
+            // Add ambient light for better overall illumination
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+
+            console.log('Configuring controls...');
+            // Enhanced controls setup
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.target.set(0, 1, 0);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI * 0.6;
+            controls.minDistance = 3;
+            controls.maxDistance = 100; // Increased from 10 to 30 to allow more zoom out
+            controls.update();
+
+            console.log('Loading 3D model...');
+            // Load GLB model with enhanced settings
+            const loader = new GLTFLoader();
+            loader.load('/joker_pmxcon_huesos.glb', (gltf) => {
+                console.log('Model loaded successfully');
+                model = gltf.scene;
+                animations = gltf.animations;
+
+                // Enhanced model optimization
+                model.traverse((node) => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                        if (node.geometry) {
+                            node.geometry.dispose();
+                            node.geometry = node.geometry.clone();
+                            node.geometry.computeVertexNormals();
+                            node.geometry.computeBoundingSphere();
+                            node.geometry.setDrawRange(0, Infinity);
+                        }
+                        if (node.material) {
+                            node.material.dispose();
+                            node.material = node.material.clone();
+                            node.material.roughness = 0.7;
+                            node.material.metalness = 0.3;
+                        }
+                        if (node.skeleton) {
+                            skeleton = node.skeleton;
+                        }
+                    }
+                });
+                
+                // Center and scale model appropriately
+                const box = new THREE.Box3().setFromObject(model);
+                const center = box.getCenter(new THREE.Vector3());
+                model.position.sub(center);
+                model.position.y = 0;
+                
+                scene.add(model);
+
+                console.log('Setting up animations...');
+                // Enhanced animation setup
+                mixer = new THREE.AnimationMixer(model);
+                mixer.timeScale = 1; // Slightly faster animations
+                
+                setupAnimations();
+                
+                // Set initial idle animation
+                if (currentActions['idle']) {
+                    fadeToAction(currentActions['idle']);
+                }
+            }, 
+            // Loading progress callback
+            (xhr) => {
+                console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+            },
+            (error) => {
+                console.error('An error occurred while loading the model:', error);
+            });
+
+            console.log('Setting up event listeners...');
+            // Event listeners
+            window.addEventListener('resize', onWindowResize, false);
+            window.addEventListener('keydown', handleKeyDown);
+            window.addEventListener('keyup', handleKeyUp);
+        }
+
+        function setupAnimations() {
+            console.log('Setting up animation actions...');
+            if (animations && animations.length > 0) {
+                animations.forEach((clip) => {
+                    const action = mixer.clipAction(clip);
+                    action.clampWhenFinished = true;
+                    action.setLoop(THREE.LoopRepeat);
+                    currentActions[clip.name.toLowerCase()] = action;
+                });
+            }
+        }
+
+        function handleKeyDown(event) {
+            event.preventDefault();
+            keysPressed[event.code] = true;
+            const animationName = getAnimationForKey(event.code);
+            if (animationName && currentActions[animationName]) {
+                console.log(`Playing animation: ${animationName}`);
+                fadeToAction(currentActions[animationName]);
+                currentAnimation = animationName;
+            }
+        }
+
+        function handleKeyUp(event) {
+            event.preventDefault();
+            keysPressed[event.code] = false;
+            if (Object.values(keysPressed).every(value => !value)) {
+                if (currentActions['idle']) {
+                    console.log('Returning to idle animation');
+                    fadeToAction(currentActions['idle']);
+                    currentAnimation = 'idle';
+                }
+            }
+        }
+
+        function getAnimationForKey(keyCode) {
+            const animationMap = {
+                'Space': 'jump',
+                'KeyW': 'walk',
+                'KeyR': 'run',
+                'KeyI': 'idle',
+                'KeyA': 'attack',
+                'KeyD': 'dance',
+                'KeyS': 'slide', 
+                'KeyF': 'flip',
+                'KeyC': 'crouch',
+                'KeyE': 'emote'
+            };
+            return animationMap[keyCode]?.toLowerCase();
+        }
+
+        function fadeToAction(newAction, duration = 0.2) {
+            if (!newAction) return;
+
+            const current = currentActions[currentAnimation];
+            if (current) {
+                current.fadeOut(duration);
+            }
+
+            newAction.reset();
+            newAction.setEffectiveTimeScale(1);
+            newAction.setEffectiveWeight(1);
+            newAction.fadeIn(duration);
+            newAction.play();
+        }
+
+        function onWindowResize() {
+            console.log('Window resized, updating camera and renderer');
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate(currentTime = 0) {
+            requestAnimationFrame(animate);
+
+            const deltaTime = currentTime - lastTime;
+            if (deltaTime < frameInterval) return;
+
+            lastTime = currentTime - (deltaTime % frameInterval);
+
+            if (mixer) {
+                mixer.update(Math.min(deltaTime * 0.001, 1/30));
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        function createJumpAnimation(skeleton) {
+            console.log('Creating jump animation');
+            const tracks = [];
+            const bones = skeleton.bones;
+            
+            // Find leg bones
+            const leftLeg = bones.find(bone => bone.name.toLowerCase().includes('leftleg'));
+            const rightLeg = bones.find(bone => bone.name.toLowerCase().includes('rightleg'));
+            const spine = bones.find(bone => bone.name.toLowerCase().includes('spine'));
+            
+            if (!leftLeg || !rightLeg || !spine) return;
+
+            const times = [0, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0];
+            
+            // Leg rotations for jump
+            const legRotations = [
+                0, 0, 0, 1,           // Start
+                0.3, 0, 0, 0.95,      // Bend knees
+                0.5, 0, 0, 0.87,      // Deep bend
+                -0.2, 0, 0, 0.98,     // Push off
+                0, 0, 0, 1,           // Straighten in air
+                0.3, 0, 0, 0.95,      // Prepare for landing
+                0, 0, 0, 1            // Land
+            ];
+
+            // Spine rotations for balance
+            const spineRotations = [
+                0, 0, 0, 1,           // Start
+                -0.1, 0, 0, 0.995,    // Slight lean forward
+                -0.2, 0, 0, 0.98,     // More forward lean
+                0, 0, 0, 1,           // Straighten in air
+                0.1, 0, 0, 0.995,     // Slight back lean
+                0, 0, 0, 1,           // Straighten for landing
+                0, 0, 0, 1            // Landed
+            ];
+
+            // Add tracks for both legs and spine
+            tracks.push(
+                new THREE.QuaternionKeyframeTrack(
+                    `${leftLeg.name}.quaternion`,
+                    times,
+                    legRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${rightLeg.name}.quaternion`,
+                    times,
+                    legRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${spine.name}.quaternion`,
+                    times,
+                    spineRotations
+                )
+            );
+
+            return new THREE.AnimationClip('jump', 1, tracks);
+        }
+
+        function createDanceAnimation(skeleton) {
+            console.log('Creating dance animation');
+            const tracks = [];
+            const bones = skeleton.bones;
+            
+            // Find relevant bones
+            const hips = bones.find(bone => bone.name.toLowerCase().includes('hip'));
+            const spine = bones.find(bone => bone.name.toLowerCase().includes('spine'));
+            const leftArm = bones.find(bone => bone.name.toLowerCase().includes('leftarm'));
+            const rightArm = bones.find(bone => bone.name.toLowerCase().includes('rightarm'));
+            
+            if (!hips || !spine || !leftArm || !rightArm) return;
+
+            const times = [0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
+            
+            // Hip rotations
+            const hipRotations = [
+                0, 0, 0, 1,             // Start
+                0, 0, 0.3, 0.95,        // Twist right
+                0, 0, 0, 1,             // Center
+                0, 0, -0.3, 0.95,       // Twist left
+                0, 0, 0, 1,             // Center
+                0, 0, 0.3, 0.95,        // Twist right
+                0, 0, 0, 1,             // Center
+                0, 0, -0.3, 0.95,       // Twist left
+                0, 0, 0, 1              // End
+            ];
+
+            // Arm rotations
+            const leftArmRotations = [
+                0, 0, 0, 1,             // Start
+                0.3, 0, 0.2, 0.93,      // Up and out
+                0, 0, 0.4, 0.92,        // Side
+                -0.3, 0, 0.2, 0.93,     // Down and out
+                0, 0, 0, 1,             // Center
+                0.3, 0, -0.2, 0.93,     // Up and out
+                0, 0, -0.4, 0.92,       // Side
+                -0.3, 0, -0.2, 0.93,    // Down and out
+                0, 0, 0, 1              // End
+            ];
+
+            const rightArmRotations = [
+                0, 0, 0, 1,             // Start
+                -0.3, 0, -0.2, 0.93,    // Mirror of left
+                0, 0, -0.4, 0.92,
+                0.3, 0, -0.2, 0.93,
+                0, 0, 0, 1,
+                -0.3, 0, 0.2, 0.93,
+                0, 0, 0.4, 0.92,
+                0.3, 0, 0.2, 0.93,
+                0, 0, 0, 1
+            ];
+
+            tracks.push(
+                new THREE.QuaternionKeyframeTrack(
+                    `${hips.name}.quaternion`,
+                    times,
+                    hipRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${leftArm.name}.quaternion`,
+                    times,
+                    leftArmRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${rightArm.name}.quaternion`,
+                    times,
+                    rightArmRotations
+                )
+            );
+            
+            return new THREE.AnimationClip('dance', 2, tracks);
+        }
+
+        function createSlideAnimation(skeleton) {
+            console.log('Creating slide animation');
+            const tracks = [];
+            const bones = skeleton.bones;
+            
+            // Find relevant bones
+            const leftLeg = bones.find(bone => bone.name.toLowerCase().includes('leftleg'));
+            const rightLeg = bones.find(bone => bone.name.toLowerCase().includes('rightleg'));
+            const spine = bones.find(bone => bone.name.toLowerCase().includes('spine'));
+            
+            if (!leftLeg || !rightLeg || !spine) return;
+
+            const times = [0, 0.15, 0.3, 0.45, 0.6];
+            
+            // Leg rotations for slide
+            const legRotations = [
+                0, 0, 0, 1,           // Start
+                0.4, 0, 0, 0.92,      // Bend for slide
+                0.5, 0, 0, 0.87,      // Deep slide
+                0.3, 0, 0, 0.95,      // Recovery
+                0, 0, 0, 1            // End
+            ];
+
+            // Spine lean for slide
+            const spineRotations = [
+                0, 0, 0, 1,           // Start
+                -0.3, 0, 0, 0.95,     // Forward lean
+                -0.4, 0, 0, 0.92,     // Deep lean
+                -0.2, 0, 0, 0.98,     // Recovery
+                0, 0, 0, 1            // End
+            ];
+
+            tracks.push(
+                new THREE.QuaternionKeyframeTrack(
+                    `${leftLeg.name}.quaternion`,
+                    times,
+                    legRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${rightLeg.name}.quaternion`,
+                    times,
+                    legRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${spine.name}.quaternion`,
+                    times,
+                    spineRotations
+                )
+            );
+            
+            return new THREE.AnimationClip('slide', 0.6, tracks);
+        }
+
+        function createFlipAnimation(skeleton) {
+            console.log('Creating flip animation');
+            const tracks = [];
+            const bones = skeleton.bones;
+            
+            // Find relevant bones
+            const spine = bones.find(bone => bone.name.toLowerCase().includes('spine'));
+            const neck = bones.find(bone => bone.name.toLowerCase().includes('neck'));
+            const leftArm = bones.find(bone => bone.name.toLowerCase().includes('leftarm'));
+            const rightArm = bones.find(bone => bone.name.toLowerCase().includes('rightarm'));
+            
+            if (!spine || !neck || !leftArm || !rightArm) return;
+
+            const times = [0, 0.25, 0.5, 0.75, 1.0];
+            
+            // Spine rotation for flip
+            const spineRotations = [
+                0, 0, 0, 1,               // Start
+                0.7071, 0, 0, 0.7071,     // 90 degrees
+                1, 0, 0, 0,               // Upside down
+                -0.7071, 0, 0, 0.7071,    // 270 degrees
+                0, 0, 0, 1                // Complete flip
+            ];
+
+            // Arm rotations for style
+            const armRotations = [
+                0, 0, 0, 1,               // Start
+                0.3, 0, 0.2, 0.93,        // Up and out
+                0.5, 0, 0, 0.87,          // Tucked
+                0.3, 0, -0.2, 0.93,       // Recovery
+                0, 0, 0, 1                // End
+            ];
+
+            tracks.push(
+                new THREE.QuaternionKeyframeTrack(
+                    `${spine.name}.quaternion`,
+                    times,
+                    spineRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${leftArm.name}.quaternion`,
+                    times,
+                    armRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${rightArm.name}.quaternion`,
+                    times,
+                    armRotations
+                )
+            );
+            
+            return new THREE.AnimationClip('flip', 1, tracks);
+        }
+
+        function createCrouchAnimation(skeleton) {
+            console.log('Creating crouch animation');
+            const tracks = [];
+            const bones = skeleton.bones;
+            
+            // Find relevant bones
+            const leftLeg = bones.find(bone => bone.name.toLowerCase().includes('leftleg'));
+            const rightLeg = bones.find(bone => bone.name.toLowerCase().includes('rightleg'));
+            const spine = bones.find(bone => bone.name.toLowerCase().includes('spine'));
+            
+            if (!leftLeg || !rightLeg || !spine) return;
+
+            const times = [0, 0.25, 0.5, 0.75, 1.0];
+            
+            // Leg rotations for crouch
+            const legRotations = [
+                0, 0, 0, 1,           // Start
+                0.3, 0, 0, 0.95,      // Begin bend
+                0.5, 0, 0, 0.87,      // Full crouch
+                0.3, 0, 0, 0.95,      // Rising
+                0, 0, 0, 1            // End
+            ];
+
+            // Spine adjustments for balance
+            const spineRotations = [
+                0, 0, 0, 1,           // Start
+                -0.1, 0, 0, 0.995,    // Slight forward lean
+                -0.2, 0, 0, 0.98,     // More lean
+                -0.1, 0, 0, 0.995,    // Straightening
+                0, 0, 0, 1            // End
+            ];
+
+            tracks.push(
+                new THREE.QuaternionKeyframeTrack(
+                    `${leftLeg.name}.quaternion`,
+                    times,
+                    legRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${rightLeg.name}.quaternion`,
+                    times,
+                    legRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${spine.name}.quaternion`,
+                    times,
+                    spineRotations
+                )
+            );
+            
+            return new THREE.AnimationClip('crouch', 1, tracks);
+        }
+
+        function createEmoteAnimation(skeleton) {
+            console.log('Creating emote animation');
+            const tracks = [];
+            const bones = skeleton.bones;
+            
+            // Find relevant bones
+            const spine = bones.find(bone => bone.name.toLowerCase().includes('spine'));
+            const leftArm = bones.find(bone => bone.name.toLowerCase().includes('leftarm'));
+            const rightArm = bones.find(bone => bone.name.toLowerCase().includes('rightarm'));
+            const head = bones.find(bone => bone.name.toLowerCase().includes('head'));
+            
+            if (!spine || !leftArm || !rightArm || !head) return;
+
+            const times = [0, 0.2, 0.4, 0.6, 0.8, 1.0];
+            
+            // Head nod animation
+            const headRotations = [
+                0, 0, 0, 1,           // Start
+                0.2, 0, 0, 0.98,      // Nod down
+                0, 0, 0, 1,           // Center
+                -0.1, 0, 0, 0.995,    // Slight back
+                0, 0, 0.1, 0.995,     // Tilt
+                0, 0, 0, 1            // End
+            ];
+
+            // Arm waves
+            const leftArmRotations = [
+                0, 0, 0, 1,           // Start
+                0.3, 0, 0.2, 0.93,    // Up and out
+                0.4, 0, 0, 0.92,      // Wave
+                0.3, 0, -0.2, 0.93,   // Different position
+                0.2, 0, 0.1, 0.97,    // Lower
+                0, 0, 0, 1            // End
+            ];
+
+            const rightArmRotations = [
+                0, 0, 0, 1,           // Start
+                -0.3, 0, -0.2, 0.93,  // Mirror of left
+                -0.4, 0, 0, 0.92,
+                -0.3, 0, 0.2, 0.93,
+                -0.2, 0, -0.1, 0.97,
+                0, 0, 0, 1
+            ];
+
+            tracks.push(
+                new THREE.QuaternionKeyframeTrack(
+                    `${head.name}.quaternion`,
+                    times,
+                    headRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${leftArm.name}.quaternion`,
+                    times,
+                    leftArmRotations
+                ),
+                new THREE.QuaternionKeyframeTrack(
+                    `${rightArm.name}.quaternion`,
+                    times,
+                    rightArmRotations
+                )
+            );
+            
+            return new THREE.AnimationClip('emote', 1, tracks);
+        }
+    </script>
+</head>
+<body>
+    <div id="controls" style="position: fixed; top: 10px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 10px;">
+        <h3>Controls:</h3>
+        <p>Space - Jump</p>
+        <p>W - Walk</p>
+        <p>R - Run</p>
+        <p>I - Idle</p>
+        <p>A - Attack</p>
+        <p>D - Dance</p>
+        <p>S - Slide</p>
+        <p>F - Flip</p>
+        <p>C - Crouch</p>
+        <p>E - Emote</p>
+    </div>
+</body>
+
+</html>
