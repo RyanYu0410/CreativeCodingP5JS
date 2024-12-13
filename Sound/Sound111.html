@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Visualization</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
+    <script>
+        // Audio variables
+        let mic;
+        let fft;
+        let amp;
+        let delay;
+        let reverb;
+        let rainSound;
+
+        // Canvas and animation variables
+        let targetWidth, targetHeight;
+        let resizeSpeed = 0.1;
+        let smoothedLevel = 0;
+        let levelSmoothing = 0.1;
+        let time = 0;
+
+        // Circle interaction variables
+        let isCenterCircleClicked = false;
+        let centerCircleSize = 100;  
+        let targetCircleSize = 100;  
+        let isPressed = false;       
+        let circleTransitionSpeed = 0.1; 
+        let holdStartTime = 0;       
+        let maxHoldTime = 300;      
+        let currentBgColor = 0;      
+        let targetBgColor = 0;       
+        let bgColorTransitionSpeed = 0.1; 
+        
+        // Visual effect arrays
+        let fallingCircles = [];
+        let ripples = [];
+
+        function preload() {
+            rainSound = loadSound('rain-sound-188158.mp3');
+        }
+
+        function setup() {
+            targetWidth = windowWidth;
+            targetHeight = windowHeight;
+            createCanvas(targetWidth, targetHeight);
+
+            mic = new p5.AudioIn();
+            mic.start();
+
+            fft = new p5.FFT();
+            fft.setInput(mic);
+
+            amp = new p5.Amplitude();
+            amp.setInput(mic);
+
+            delay = new p5.Delay();
+            reverb = new p5.Reverb();
+            mic.connect(delay);
+            delay.connect(reverb);
+
+            delay.delayTime(0.25);
+            delay.feedback(0.7);
+            reverb.drywet(0.5);
+
+            rainSound.loop();
+            rainSound.setVolume(1.0);
+        }
+
+        function draw() {
+            let currentWidth = lerp(width, targetWidth, resizeSpeed);
+            let currentHeight = lerp(height, targetHeight, resizeSpeed);
+            resizeCanvas(currentWidth, currentHeight, true);
+
+            targetBgColor = isPressed ? 128 : 0;
+            currentBgColor = lerp(currentBgColor, targetBgColor, bgColorTransitionSpeed);
+            background(currentBgColor);
+
+            let level = amp.getLevel();
+            smoothedLevel = lerp(smoothedLevel, level, levelSmoothing);
+            time += 0.01;
+
+            let spectrum = fft.analyze();
+            
+            let holdProgress = 0;
+            if (isPressed) {
+                holdProgress = min((millis() - holdStartTime) / maxHoldTime, 1);
+                rainSound.setVolume(1 - holdProgress);
+            } else {
+                rainSound.setVolume(1.0);
+            }
+            
+            let gridCols = 10;
+            let gridRows = 8;
+            let cellWidth = width / gridCols;
+            let cellHeight = height / gridRows;
+            
+            for (let col = 0; col < gridCols; col++) {
+                for (let row = 0; row < gridRows; row++) {
+                    let spectrumIndex = Math.floor(map(col + row * gridCols, 0, gridCols * gridRows, 0, spectrum.length));
+                    let spectrumValue = spectrum[spectrumIndex];
+                    
+                    let x = col * cellWidth;
+                    let y = row * cellHeight;
+                    
+                    let intensity = map(spectrumValue, 0, 255, 0, 8);
+                    
+                    let blue = map(holdProgress, 0, 1, 0, 255);
+                    let alpha = map(spectrumValue, 0, 255, 25, 128); // Reduced alpha range from 50-255 to 25-128
+                    
+                    if (blue > 100) {
+                        for (let j = 0; j < intensity; j++) {
+                            let xPos = x + random(0, cellWidth);
+                            let yPos = y + random(0, cellHeight);
+                            fallingCircles.push({
+                                x: xPos,
+                                y: yPos,
+                                size: random(5, 15),
+                                speed: random(4, 6), // Increased speed range from 2-5 to 5-10
+                                color: color(255 - blue, 255 - blue, 255, alpha)
+                            });
+                        }
+                    } else {
+                        stroke(255 - blue, 255 - blue, 255, alpha);
+                        strokeWeight(map(spectrumValue, 0, 255, 0.5, 2));
+                        for (let j = 0; j < intensity; j++) {
+                            let xPos = x + random(0, cellWidth);
+                            let yPos = y + random(0, cellHeight);
+                            let rainAngle = map(sin(x * 0.005 + time), -1, 1, -1, 1);
+                            line(xPos, yPos, xPos + rainAngle, yPos + 50);
+                        }
+                    }
+                }
+            }
+
+            for (let i = fallingCircles.length - 1; i >= 0; i--) {
+                let circle = fallingCircles[i];
+                noStroke();
+                fill(circle.color);
+                ellipse(circle.x, circle.y, circle.size);
+                circle.y += circle.speed;
+                circle.speed *= 1.02; // Accelerate the falling speed
+                
+                if (circle.y > height) {
+                    fallingCircles.splice(i, 1);
+                    
+                    let rippleExists = false;
+                    for (let ripple of ripples) {
+                        if (dist(circle.x, height - 50, ripple.x, ripple.y) < 30) {
+                            rippleExists = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!rippleExists) {
+                        ripples.push({
+                            x: circle.x,
+                            y: height - 50,
+                            size: 20,
+                            lifetime: 255
+                        });
+                    }
+                }
+            }
+
+            noFill();
+            for (let i = ripples.length - 1; i >= 0; i--) {
+                let ripple = ripples[i];
+                stroke(255, ripple.lifetime);
+                ellipse(ripple.x, ripple.y, ripple.size, ripple.size * 0.3);
+                ripple.size += 2;
+                ripple.lifetime -= 10;
+                
+                if (ripple.lifetime <= 0) {
+                    ripples.splice(i, 1);
+                }
+            }
+
+            if (isPressed) {
+                targetCircleSize = 300;
+            } else {
+                targetCircleSize = map(smoothedLevel, 0, 1, 100, 600);
+            }
+            centerCircleSize = lerp(centerCircleSize, targetCircleSize, circleTransitionSpeed);
+
+            let circleBlue = map(holdProgress, 0, 1, 0, 255);
+            fill(255 - circleBlue, 255 - circleBlue, 255);
+            ellipse(width / 2, height / 2, centerCircleSize);
+
+            fill(0, 150);
+            noStroke();
+            rect(0, height, width, 60);
+        }
+
+        function mousePressed() {
+            let distance = dist(mouseX, mouseY, width / 2, height / 2);
+            if (distance < centerCircleSize / 2) {
+                isCenterCircleClicked = !isCenterCircleClicked;
+                isPressed = true;
+                holdStartTime = millis();
+            }
+        }
+
+        function mouseReleased() {
+            isPressed = false;
+        }
+
+        function windowResized() {
+            targetWidth = windowWidth;
+            targetHeight = windowHeight;
+        }
+    </script>
+</body>
+</html>
